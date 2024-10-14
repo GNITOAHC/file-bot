@@ -13,6 +13,15 @@ For instance:
 curl -F 'file=@./png.png' http://127.0.0.1:8000/discord
 ```
 
+Response:
+
+```json
+{
+  "status": "ok",
+  "url": "https://cdn.discordapp.com/attachments/123456789/123456789/png.png?ex=..."
+}
+```
+
 ## Self Hosting via Shuttle
 
 ### Prerequisites
