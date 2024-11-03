@@ -1,6 +1,8 @@
 use axum::{
     extract::{Multipart, State},
-    response::Json,
+    http::StatusCode,
+    response::IntoResponse,
+    Json,
 };
 use reqwest::multipart;
 use serde_json::{json, Value};
@@ -13,7 +15,7 @@ const DISCORD_GUILD_API: &str = "https://discord.com/api/v10/guilds/{guild_id}/c
 pub async fn send_file(
     State(state): State<AppState>,
     mut multipart: Multipart,
-) -> Json<serde_json::Value> {
+) -> impl IntoResponse {
     let discord_info = &state.discord_info;
 
     // Extract channel id
@@ -26,27 +28,39 @@ pub async fn send_file(
     {
         Ok(channel_id) => channel_id,
         Err(e) => {
-            return (json!({"status": "error", "message": e.to_string()})).into();
+            return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
         }
     };
 
     // println!("Channel ID: {}", channel_id);
 
-    if let Some(field) = multipart.next_field().await.unwrap() {
-        if let Some(file_name) = field.file_name().map(|x| x.to_string()) {
-            let data = field.bytes().await.unwrap();
-            match upload(&file_name, &data, &channel_id, &discord_info.bot_api_key).await {
-                Ok(s) => {
-                    return (json!({"status": "ok", "url": s})).into();
-                }
-                Err(e) => {
-                    return (json!({"status": "error", "message": e.to_string()})).into();
-                }
-            }
+    let field = match multipart.next_field().await.unwrap() {
+        Some(field) => field,
+        None => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "Failed to read multipart field in the request",
+            )
+                .into_response();
+        }
+    };
+
+    let file_name = match field.file_name().map(|x| x.to_string()) {
+        Some(file_name) => file_name,
+        None => {
+            return (StatusCode::BAD_REQUEST, "File name is missing").into_response();
+        }
+    };
+
+    let data = field.bytes().await.unwrap(); // .bytes() moves the field
+    match upload(&file_name, &data, &channel_id, &discord_info.bot_api_key).await {
+        Ok(s) => {
+            return (StatusCode::OK, Json(json!({"url": s}))).into_response();
+        }
+        Err(e) => {
+            return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
         }
     }
-
-    return (json!({"status": "error"})).into();
 }
 
 async fn upload(
