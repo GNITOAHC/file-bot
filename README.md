@@ -4,23 +4,33 @@ A simple Axum web service, built on top of Discord APIs.
 
 ## Features
 
--   POST to `/discord` endpoint to upload a file
+-   POST to `/file` endpoint to upload a file
+-   Navigate to `/` for GUI support
 -   Returns a JSON response containing the status and the URL of the uploaded file.
 
 For instance:
 
 ```bash
-curl -F 'file=@./png.png' http://127.0.0.1:8000/discord
+curl -F 'file=@./png.png' http://127.0.0.1:8000/file
 ```
 
 Response:
 
 ```json
 {
-  "status": "ok",
-  "url": "https://cdn.discordapp.com/attachments/123456789/123456789/png.png?ex=..."
+    "files": [
+        {
+            "name": "file_name.png",
+            "url": "https://cdn.discordapp.com/attachments/123456789/123456789/png.png?ex=..."
+        }
+    ]
 }
 ```
+
+Or GUI support:
+
+<img src="./docs/capture.png" width="300" />  
+Drag-and-drop to upload
 
 ## Self Hosting via Shuttle
 
