@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="CACHE-CONTROL" content="NO-CACHE" />
+
+    <title>File Upload</title>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@2.0.3"></script>
+
+    <!-- Tailwind CSS Play CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Alpine.js -->
+    <script
+      defer
+      src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.3/dist/cdn.min.js"
+    ></script>
+  </head>
+
+  <body class="bg-gray-100 flex items-center justify-center h-screen">
+    <div
+      x-data="dragDropFiles()"
+      class="w-full max-w-md p-8 bg-white shadow-lg rounded-lg"
+    >
+      <h2 class="text-2xl font-bold text-center mb-4">Upload Your File</h2>
+
+      <div
+        x-bind:class="{'bg-blue-100 border-blue-400': isDragging, 'bg-gray-100 border-gray-300': !isDragging}"
+        class="border-2 border-dashed rounded-lg p-6 text-center"
+        @dragover.prevent="isDragging = true"
+        @dragleave="isDragging = false"
+        @drop.prevent="handleDrop($event)"
+      >
+        <p class="text-gray-400" x-show="!files.length">
+          Drag & Drop files here or click to select
+        </p>
+        <ul class="gap-y-2">
+          <template x-for="(file, index) in files" :key="file.name">
+            <li class="flex gap-x-2 text-sm font-medium">
+              <button @click="removeFile(index)" class="text-red-400">
+                &#10005;
+              </button>
+              <button @click="await uploadFiles(index)" class="text-green-400">
+                &#10003;
+              </button>
+              <span x-text="file.name"></span>
+            </li>
+          </template>
+        </ul>
+      </div>
+
+      <input
+        type="file"
+        class="hidden"
+        @change="handleFiles($event)"
+        multiple
+        x-ref="fileInput"
+      />
+
+      <button
+        @click="files.length ? await uploadFiles(-1) : $refs.fileInput.click()"
+        class="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-4 rounded-md"
+        x-text="files.length ? (isUploading ? 'Uploading...' : 'Upload Files') : 'Select Files'"
+      ></button>
+
+      <ul class="gap-y-2">
+        <template x-for="(r, i) in results" :key="i">
+          <li class="flex gap-x-2 items-center" x-data="{ tooltip: r.url }">
+            <span x-text="r.name"></span>
+            <button
+              @click="navigator.clipboard.writeText(r.url); tooltip = 'Copied!'; setTimeout(() => tooltip = r.url, 1000)"
+              class="relative group flex items-center"
+            >
+              <svg-link class="w-4 h-4"></svg-link>
+              <div
+                x-text="tooltip"
+                class="absolute bottom-full mb-2 hidden group-hover:block w-max bg-gray-800 text-white text-xs rounded py-1 px-2 shadow-lg"
+              ></div>
+            </button>
+          </li>
+        </template>
+      </ul>
+    </div>
+
+    <script>
+      function dragDropFiles() {
+        return {
+          isDragging: false,
+          isUploading: false,
+          files: [],
+          results: [],
+          handleDrop(event) {
+            this.isDragging = false
+            this.files = [...event.dataTransfer.files]
+          },
+          handleFiles(event) {
+            this.files = [...event.target.files]
+          },
+          removeFile(index) {
+            this.files.splice(index, 1)
+          },
+          async uploadFiles(index) {
+            const file = this.files[index]
+            const formData = new FormData()
+            if (index == -1) {
+              for (const file of this.files) {
+                formData.append('file', file)
+              }
+            } else {
+              formData.append('file', this.files[index])
+            }
+            this.isUploading = true
+            let response = await fetch('/file', {
+              method: 'POST',
+              body: formData,
+            })
+            if (!response.ok) {
+              window.alert(await response.text())
+              this.isUploading = false
+              return
+            }
+            const data = await response.json()
+            if (index == -1) {
+              this.files = []
+            } else {
+              this.removeFile(index)
+            }
+            for (const file of data.files) {
+              this.results.push(file)
+            }
+            this.isUploading = false
+          },
+        }
+      }
+    </script>
+
+    <script>
+      class SvgLink extends HTMLElement {
+        constructor() {
+          super()
+          const markup = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-link"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>`
+          this.innerHTML = markup
+        }
+      }
+      customElements.define('svg-link', SvgLink)
+    </script>
+  </body>
+</html>

@@ -1,4 +1,5 @@
 use axum::{
+    extract::DefaultBodyLimit,
     routing::{get, post},
     Router,
 };
@@ -28,7 +29,12 @@ async fn main(#[shuttle_runtime::Secrets] secrets: SecretStore) -> shuttle_axum:
 
     let router = Router::new()
         .route("/", get(hello_world))
-        .route("/discord", post(discord::discord::send_file))
+        .route("/test", post(hello_world))
+        .route(
+            "/file",
+            post(discord::discord::send_file).get(discord::form::send_file_form),
+        )
+        .layer(DefaultBodyLimit::max(8000000))
         .with_state(state);
 
     Ok(router.into())

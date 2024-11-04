@@ -34,33 +34,36 @@ pub async fn send_file(
 
     // println!("Channel ID: {}", channel_id);
 
-    let field = match multipart.next_field().await.unwrap() {
-        Some(field) => field,
-        None => {
-            return (
-                StatusCode::INTERNAL_SERVER_ERROR,
-                "Failed to read multipart field in the request",
-            )
-                .into_response();
-        }
-    };
+    let mut results = Vec::new();
 
-    let file_name = match field.file_name().map(|x| x.to_string()) {
-        Some(file_name) => file_name,
-        None => {
-            return (StatusCode::BAD_REQUEST, "File name is missing").into_response();
-        }
-    };
-
-    let data = field.bytes().await.unwrap(); // .bytes() moves the field
-    match upload(&file_name, &data, &channel_id, &discord_info.bot_api_key).await {
-        Ok(s) => {
-            return (StatusCode::OK, Json(json!({"url": s}))).into_response();
-        }
-        Err(e) => {
-            return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+    while let Some(field) = multipart.next_field().await.unwrap() {
+        let file_name = match field.file_name().map(|x| x.to_string()) {
+            Some(file_name) => file_name,
+            None => {
+                return (StatusCode::BAD_REQUEST, "File name is missing").into_response();
+            }
+        };
+        let data = match field.bytes().await {
+            Ok(data) => data,
+            Err(_) => {
+                return (
+                    StatusCode::BAD_REQUEST,
+                    "Failed to read data (or file too large)",
+                )
+                    .into_response();
+            }
+        };
+        match upload(&file_name, &data, &channel_id, &discord_info.bot_api_key).await {
+            Ok(s) => {
+                results.push(json!({"name": file_name, "url": s}));
+            }
+            Err(e) => {
+                return (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response();
+            }
         }
     }
+
+    (StatusCode::OK, Json(json!({"files": results}))).into_response()
 }
 
 async fn upload(

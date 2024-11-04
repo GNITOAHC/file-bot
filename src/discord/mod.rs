@@ -1,4 +1,5 @@
 pub mod discord;
+pub mod form;
 
 #[derive(Clone, Debug)]
 pub struct DiscordInfo {
